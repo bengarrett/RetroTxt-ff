@@ -1,0 +1,178 @@
+# Task runner for Manifest V3 on Firefox browsers
+# ===============================================
+#
+# This task runner requires Task to be installed.
+# https://taskfile.dev/#/installation
+#
+# Tasks for this "-ff" repo only handle code,
+# other tasks such as documentation generation
+# has been removed.
+#
+version: '3'
+
+silent: true
+
+vars:
+  REQPNPM: 'task requires the installation of pnpm: https://pnpm.io/installation'
+  REQSHX: 'task requires the installation of shelljs/shx: https://github.com/shelljs/shx'
+  REQWEXT: 'task requires the installation of Web-ext: https://github.com/mozilla/web-ext'
+
+tasks:
+  default:
+    desc: List the available tasks.
+    cmds:
+      - task --list
+
+  # install and uninstall packages and libraries
+  inst-packages:
+    desc: Installs both the dependencies and dev-dependencies contained in the package.json.
+    aliases: [i]
+    preconditions:
+      - sh: pnpm -v
+        msg: '{{.REQPNPM}}'
+    cmds:
+      - cmd: pnpm install
+      - task: packages-copy
+
+  inst-puppeteer:
+    desc: Download the required Firefox browser for Puppeteer.
+    aliases: [ip]
+    cmds:
+      - cmd: pnpm exec puppeteer browsers install firefox
+
+  rm-puppeteer:
+    desc: Remove the downloaded Firefox browser for Puppeteer.
+    aliases: [rp]
+    cmds:
+      - cmd: rm -rf ~/.cache/puppeteer
+
+  # linting commands
+  lints:
+    desc: Run both regular linting and security linting.
+    aliases: [ll]
+    ignore_error: true
+    cmds:
+      - task: lint
+      - task: lint-security
+
+  lint:
+    desc: Lint the JavaScript files in the `ext` directory.
+    aliases: [l]
+    ignore_error: true
+    cmds:
+      - cmd: echo 'Running ESLint on extension scripts...'
+      # node and dependencies
+      - cmd: pnpm exec eslint ext/scripts/sw/*.js --stats
+      - cmd: pnpm exec eslint ext/scripts/*.js --stats
+
+  # user commands that are displayed with `task --list`
+  build:
+    desc: Creates the submission package for Firefox.
+    summary: |
+      Creates a package that is intended for submission to the Firefox Add-ons.
+
+      Packaged file will be located in /web-ext-artifacts
+    cmds:
+      - task: build-firefox
+
+  build-firefox:
+    # edit web-ext-firefox.mjs to hide files and directories
+    preconditions:
+      - sh: pnpm -v
+        msg: '{{.REQPNPM}}'
+      - sh: pnpm exec web-ext --version
+        msg: '{{.REQWEXT}}'
+    cmds:
+      - task: packages-copy
+      - cmd: pnpm exec web-ext --config ext/.web-ext-firefox.mjs --source-dir ./ext build
+        ignore_error: true
+
+  checks:
+    desc: Check, run and print the versions of the task commands and dependencies.
+    ignore_error: true
+    cmds:
+      # node and dependencies
+      - cmd: echo '• Checking Node.js'
+      - cmd: pnpm exec shx echo -n "Node.js "
+      - cmd: node --version
+      - cmd: echo '• Checking pnpm and web-ext'
+      - cmd: pnpm exec shx echo -n "pnpm version "
+      - cmd: pnpm --version
+      - cmd: pnpm exec shx --version
+      - cmd: pnpm exec shx echo -n "Web-ext v"
+      - cmd: pnpm exec web-ext --version
+      # system tools
+      - cmd: echo '• Checking Git and Task'
+      - cmd: git --version
+      - cmd: task --version
+
+  # packages for the web extension and builds
+  packages-copy:
+    desc: Copies the dependencies from `node_modules` over to the `ext` directory.
+    aliases: [pc]
+    preconditions:
+      - sh: pnpm -v
+        msg: '{{.REQPNPM}}'
+      - sh: pnpm exec shx --version
+        msg: '{{.REQSHX}}'
+    # use shx for Windows compatibility
+    cmds:
+      - cmd: pnpm exec shx cp -f "node_modules/bulma/css/bulma.min.css" "ext/css/bulma.min.css"
+      - cmd: pnpm exec shx cp -f "node_modules/qunit/qunit/qunit.css" "ext/test/qunit.css"
+      - cmd: pnpm exec shx cp -f "node_modules/qunit/qunit/qunit.js" "ext/test/qunit.js"
+      - cmd: pnpm exec shx cp -f "node_modules/linkifyjs/dist/linkify.js" "ext/js/linkify.js"
+      - cmd: pnpm exec shx cp -f "node_modules/linkify-plugin-ip/dist/linkify-plugin-ip.js" "ext/js/linkify-plugin-ip.js"
+      - cmd: pnpm exec shx cp -f "node_modules/linkify-element/dist/linkify-element.js" "ext/js/linkify-element.js"
+      - cmd: pnpm exec shx cp -f "node_modules/dompurify/dist/purify.js" "ext/js/purify.js"
+
+  packages-latest:
+    desc: Interactively update to the latest dependencies and copy them to the `ext` directory.
+    aliases: [pl]
+    preconditions:
+      - sh: pnpm -v
+        msg: '{{.REQPNPM}}'
+      - sh: pnpm exec shx --version
+        msg: '{{.REQSHX}}'
+    cmds:
+      - cmd: pnpm update --interactive --latest
+      - cmd: pnpm exec shx echo ""
+      - task: packages-copy
+
+  packages-update:
+    desc: Updates all dependencies to the latest version and copies them to the `ext` directory.
+    aliases: [pu]
+    preconditions:
+      - sh: pnpm -v
+        msg: '{{.REQPNPM}}'
+      - sh: pnpm exec shx --version
+        msg: '{{.REQSHX}}'
+    cmds:
+      - cmd: pnpm update
+      - cmd: pnpm exec shx echo ""
+      - task: packages-copy
+
+  # unit tests
+  test:
+    desc: Run QUnit tests.
+    aliases: [t]
+    cmds:
+      - cmd: node ext/test/qunit-terminal.mjs
+  test-old:
+    desc: Run QUnit tests in a real Firefox WebExtension context using Puppeteer.
+    aliases: [to]
+    cmds:
+      - cmd: node ext/test/qunit-puppeteer.mjs
+
+  test-cli:
+    desc: Run QUnit tests in headless Firefox using Puppeteer, it will return failed tests.
+    aliases: [tc]
+    cmds:
+      - cmd: node ext/test/qunit-headless.mjs
+
+  test-webextension:
+    desc: Run RetroTxt WebExtension with proper file:/// URL handling.
+    aliases: [ext]
+    cmds:
+      - cmd: echo 'Testing RetroTxt WebExtension with file:/// URLs...'
+      - cmd: cd ext && node test/autogen-webextension.mjs
+      - cmd: echo 'WebExtension test completed. Check browser for results.'

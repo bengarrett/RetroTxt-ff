@@ -1,0 +1,16 @@
+# Packages #
+############
+
+# build packages
+web-ext-artifacts
+*.xpi
+ext.crx
+ext.pem
+
+# legacy dependencies
+node_modules
+
+# other
+.env
+.DS_Store
+
