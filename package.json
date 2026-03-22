@@ -17,7 +17,6 @@
     "eslint-plugin-security": "^4.0.0",
     "eslint-plugin-sonarjs": "^4.0.2",
     "eslint-plugin-xss": "^0.1.12",
-    "nyc": "^18.0.0",
     "prettier": "^3.8.1",
     "puppeteer": "^24.39.1",
     "shx": "^0.4.0",
@@ -26,10 +25,10 @@
     "web-ext": "^10.0.0"
   },
   "scripts": {
-    "font": "woff2_compress.js",
     "test": "qunit test/index.html",
-    "test:coverage": "nyc npm test",
-    "coverage": "nyc report --reporter=text --reporter=html",
-    "coverage:check": "nyc check-coverage --lines 80 --functions 80 --branches 70"
+    "lint": "web-ext lint --ignore-files=js/purify.js test/qunit.js"
+  },
+  "webExt": {
+    "sourceDir": "ext/"
   }
 }
